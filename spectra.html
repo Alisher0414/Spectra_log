@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+
+{% block title %}Spectra Log{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <form action="{% url 'get_logs'%}" method="get">
+        <input type="text" name="serial_num" value="{{ request.GET.serial_num }}">
+        <input type="date" name="start_date" value="{{ request.GET.start_date }}">
+        <input type="date" name="end_date" value="{{ request.GET.end_date }}">
+        <button id="button1" type="submit" class="btn btn-success">Фильтр</button>
+    </form>
+    <form action="{% url 'get_logs' %}" method="get">
+            <input type="text" name="serial_num_history" value="{{ request.GET.serial_num_history }}">
+            <button id="button2" type="submit" class="btn btn-success">Получить историю</button>
+    </form>
+
+    <div id="piechart" style="width: 900px; height: 500px;"></div>
+
+    {% if rows.has_other_pages %}
+    <div class="pagination mt-3">
+        <span class="step-links">
+            {% if rows.has_previous %}
+                <a href="?page=1{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">&laquo; В начало</a>
+                <a href="?page={{ rows.previous_page_number }}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">Назад</a>
+            {% endif %}
+
+            <span class="current">
+                Страница {{ rows.number }} из {{ rows.paginator.num_pages }}.
+            </span>
+
+            {% if rows.has_next %}
+                <a href="?page={{ rows.next_page_number }}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">Далее</a>
+                <a href="?page={{ rows.paginator.num_pages }}{% if request.GET.start_date %}&start_date={{ request.GET.start_date }}{% endif %}{% if request.GET.end_date %}&end_date={{ request.GET.end_date }}{% endif %}">В конец &raquo;</a>
+            {% endif %}
+
+        </span>
+    </div>
+    {% endif %}
+    <br>
+    <table class="table table-bordered table-condensed">
+        <thead class="thead-dark">
+        <tr>
+            <th style="padding: 2px; writing-mode: vertical-rl; white-space: nowrap;"><p
+                    style="margin: 0; padding: 0 ;transform: rotate(-180deg)">Serial</p></th>
+
+            {% for name in names %}
+            <th style="padding: 2px; writing-mode: vertical-rl; white-space: nowrap;"><p
+                    style="margin: 0; padding: 0;transform: rotate(-180deg)">{{ name }}</p></th>
+            {% endfor %}
+        </tr>
+        </thead>
+        <tbody>
+        {% if serial_num_history is not None %}
+        {% for row in rows %}
+                <tr>
+                    <td>{{ row.0 }}</td>
+
+                    {% for name in names %}
+                        {% if row.1|get_key:name is not None %}
+                            {% if row.1|get_key:name|get_key:'result' is not False %}
+                                <td style="background-color: #7fffd4;">
+           <span data-toggle="tooltip" data-placement="top" title="{% for string in row.1|get_key:name|get_key:'strings' %}{{ string }}&#013;{% endfor %}">+</span>
+
+
+
+                                </td>
+                            {% else %}
+                                <td style="background-color: #ff7f50;">
+          <span data-toggle="tooltip" data-placement="top" title="{% for string in row.1|get_key:name|get_key:'strings' %}{{ string }}&#013;{% endfor %}">-</span>
+
+
+
+
+                                </td>
+                            {% endif %}
+                        {% else %}
+                            <td></td>
+                        {% endif %}
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        {% else %}
+        {% for row in rows %}
+        <tr>
+            <td>{{ row.0 }}</td>
+
+            {% for name in names %}
+            {% if row.1|get_key:name is not None %}
+            {% if row.1|get_key:name|get_key:'result' is not False %}
+            <td style="background-color: #7fffd4;">
+                <span data-toggle="tooltip" data-placement="top"
+                    title="{{ row.1|get_key:name|get_key:'status' }} {{ row.1|get_key:name|get_key:'date' }} {{ row.1|get_key:name|get_key:'time' }}">+</span>
+            </td>
+            {% else %}
+            <td style="background-color: #ff7f50;">
+                <span data-toggle="tooltip" data-placement="top"
+                    title="{{ row.1|get_key:name|get_key:'status' }} {{ row.1|get_key:name|get_key:'date' }} {{ row.1|get_key:name|get_key:'time' }}">-</span>
+            </td>
+            {% endif %}
+            {% else %}
+            <td></td>
+            {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+    <form id="exportForm" action="{% url 'get_import' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="serial_num" value="{{ request.GET.serial_num }}">
+        <input type="hidden" name="start_date" value="{{ request.GET.start_date }}">
+        <input type="hidden" name="end_date" value="{{ request.GET.end_date }}">
+        <input type="hidden" name="serial_num_history" value="{{ request.GET.serial_num_history }}">
+        <button id="exportBtn" type="button" class="btn btn-success">Экспорт в Excel</button>
+    </form>
+</div>
+<script>
+    document.getElementById('exportBtn').addEventListener('click', function() {
+        var form = document.getElementById('exportForm');
+        var formData = new FormData(form);
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', form.action);
+        xhr.setRequestHeader('X-CSRFToken', '{{ csrf_token }}');
+        xhr.responseType = 'blob'; // This tells the browser to expect a binary response (blob)
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                // Create a link element to trigger the download
+                var a = document.createElement('a');
+                a.href = window.URL.createObjectURL(xhr.response);
+                a.download = 'output.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        };
+        xhr.send(formData);
+    });
+</script>
+<script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+<script type="text/javascript">
+    google.charts.load('current', {'packages':['corechart']});
+    google.charts.setOnLoadCallback(drawChart);
+
+    function drawChart() {
+        var total = {{ stats | get_key:'Total' }};
+        var trueCount = {{ stats | get_key:'True' }};
+        var falseCount = {{ stats | get_key:'False' }};
+
+        var data = google.visualization.arrayToDataTable([
+            ['Task', 'Count'],
+            ['Успешно', trueCount],
+            ['Ошибка', falseCount]
+        ]);
+
+        var options = {
+            title: 'Статистика по проведенным тестам \n Общее количество тестов: ' + total
+        };
+
+        var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+        chart.draw(data, options);
+    }
+</script>
+
+<style>
+    .container {
+        margin-left: 0 !important;
+    }
+</style>
+{% endblock %}
