@@ -39,6 +39,15 @@
     </div>
     {% endif %}
     <br>
+    <form id="exportForm" action="{% url 'get_import' %}" method="post">
+        {% csrf_token %}
+        <input type="hidden" name="serial_num" value="{{ request.GET.serial_num }}">
+        <input type="hidden" name="start_date" value="{{ request.GET.start_date }}">
+        <input type="hidden" name="end_date" value="{{ request.GET.end_date }}">
+        <input type="hidden" name="serial_num_history" value="{{ request.GET.serial_num_history }}">
+        <button id="exportBtn" type="button" class="btn btn-success">Экспорт в Excel</button>
+    </form>
+    <br>
     <table class="table table-bordered table-condensed">
         <thead class="thead-dark">
         <tr>
@@ -108,14 +117,6 @@
         {% endif %}
         </tbody>
     </table>
-    <form id="exportForm" action="{% url 'get_import' %}" method="post">
-        {% csrf_token %}
-        <input type="hidden" name="serial_num" value="{{ request.GET.serial_num }}">
-        <input type="hidden" name="start_date" value="{{ request.GET.start_date }}">
-        <input type="hidden" name="end_date" value="{{ request.GET.end_date }}">
-        <input type="hidden" name="serial_num_history" value="{{ request.GET.serial_num_history }}">
-        <button id="exportBtn" type="button" class="btn btn-success">Экспорт в Excel</button>
-    </form>
 </div>
 <script>
     document.getElementById('exportBtn').addEventListener('click', function() {
